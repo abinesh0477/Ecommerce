@@ -1,48 +1,57 @@
 import axios from 'axios';
 
-const getApiUrl = () => {
- 
-  if (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
-  }
-  
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  
+// Safe env detection: Vite uses import.meta.env, CRA uses process.env
+const API_URL = (() => {
+  try {
+    // Vite
+    if (import.meta?.env?.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  } catch (_) { /* not Vite */ }
+  try {
+    // CRA
+    if (process?.env?.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
+  } catch (_) { /* not CRA */ }
   return 'http://localhost:5000/api';
-};
-
-const API_URL = getApiUrl();
+})();
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
-
+  timeout: 15000,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+// --- Request interceptor ---
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
-  if (config.data instanceof FormData) {
-    delete config.headers['Content-Type'];
-  } else if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
-  
-    config.headers['Content-Type'] = 'application/json';
-  }
-  return config;
-});
+    // Let the browser set Content-Type automatically for FormData
+    // (it needs to include the multipart boundary — don't override it)
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    } else if (config.data !== undefined) {
+      config.headers['Content-Type'] = 'application/json';
+    }
 
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// --- Response interceptor ---
 api.interceptors.response.use(
   (res) => res,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Only redirect on auth failure for protected routes, not login/register
+      const url = error.config?.url || '';
+      const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/register');
+      if (!isAuthRoute) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

@@ -25,13 +25,18 @@ const authService = {
   },
 
   getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = localStorage.getItem('user');
+      return user ? JSON.parse(user) : null;
+    } catch {
+      localStorage.removeItem('user');
+      return null;
+    }
   },
 
-  getToken: () => {
-    return localStorage.getItem('token');
-  },
+  getToken: () => localStorage.getItem('token'),
+
+  isAuthenticated: () => !!localStorage.getItem('token'),
 
   getAllUsers: async () => {
     const response = await api.get('/auth/users');
@@ -41,7 +46,9 @@ const authService = {
   updateProfile: async (profileData) => {
     const response = await api.put('/auth/profile', profileData);
     if (response.data.user) {
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Merge with existing user data so role/id aren't lost
+      const existing = authService.getCurrentUser() || {};
+      localStorage.setItem('user', JSON.stringify({ ...existing, ...response.data.user }));
     }
     return response.data;
   },

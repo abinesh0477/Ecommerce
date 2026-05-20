@@ -1,39 +1,65 @@
+// Reviews are stored locally (no backend endpoint).
+// Storage key is namespaced per product to avoid collisions.
 
-const STORAGE_KEY = 'product_reviews';
+const STORAGE_KEY = 'ecom_product_reviews';
 
-
-const getLocalReviews = (productId) => {
-  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  return all[productId] || [];
+const getAll = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
 };
 
-const saveLocalReviews = (productId, reviews) => {
-  const all = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  all[productId] = reviews;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+const saveAll = (data) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to save reviews to localStorage:', err);
+  }
 };
 
 const reviewService = {
-  
   getProductReviews: async (productId) => {
-    return getLocalReviews(productId);
+    if (!productId) return [];
+    const all = getAll();
+    return all[productId] || [];
   },
 
-
   addReview: async (productId, rating, comment) => {
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!productId) throw new Error('productId is required');
+    if (!rating || rating < 1 || rating > 5) throw new Error('Rating must be between 1 and 5');
+
+    let currentUser = null;
+    try {
+      currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+    } catch { /* ignore parse errors */ }
+
     const newReview = {
-      _id: Date.now().toString(),
-      user: { name: currentUser.name || 'Anonymous' },
+      _id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      user: { name: currentUser?.name || 'Anonymous' },
       rating: Number(rating),
-      comment,
-      createdAt: new Date().toISOString()
+      comment: (comment || '').trim(),
+      createdAt: new Date().toISOString(),
     };
-    const reviews = getLocalReviews(productId);
+
+    const all = getAll();
+    const reviews = all[productId] || [];
     reviews.unshift(newReview);
-    saveLocalReviews(productId, reviews);
+    all[productId] = reviews;
+    saveAll(all);
+
     return newReview;
-  }
+  },
+
+  deleteReview: async (productId, reviewId) => {
+    if (!productId || !reviewId) return;
+    const all = getAll();
+    if (all[productId]) {
+      all[productId] = all[productId].filter((r) => r._id !== reviewId);
+      saveAll(all);
+    }
+  },
 };
 
 export default reviewService;

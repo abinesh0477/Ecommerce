@@ -1,30 +1,51 @@
-// src/services/wishlistService.js - LocalStorage only (no API calls)
-const STORAGE_KEY = 'wishlist';
+// Wishlist is stored locally (no backend endpoint).
+const STORAGE_KEY = 'ecom_wishlist';
+
+const read = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    return [];
+  }
+};
+
+const write = (data) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to save wishlist:', err);
+  }
+};
 
 const wishlistService = {
-  // Get wishlist from localStorage
-  getWishlist: async () => {
-    const local = localStorage.getItem(STORAGE_KEY);
-    return local ? JSON.parse(local) : [];
-  },
+  getWishlist: async () => read(),
 
-  // Add product to wishlist (store product object)
   addToWishlist: async (product) => {
-    const current = await wishlistService.getWishlist();
-    if (!current.some(p => p._id === product._id)) {
+    if (!product?._id) throw new Error('Invalid product');
+    const current = read();
+    if (!current.some((p) => p._id === product._id)) {
       current.push(product);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      write(current);
     }
     return { success: true };
   },
 
-  // Remove product by ID
   removeFromWishlist: async (productId) => {
-    let current = await wishlistService.getWishlist();
-    current = current.filter(p => p._id !== productId);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    if (!productId) throw new Error('productId is required');
+    const current = read().filter((p) => p._id !== productId);
+    write(current);
     return { success: true };
-  }
+  },
+
+  isInWishlist: (productId) => {
+    return read().some((p) => p._id === productId);
+  },
+
+  clearWishlist: async () => {
+    write([]);
+    return { success: true };
+  },
 };
 
 export default wishlistService;

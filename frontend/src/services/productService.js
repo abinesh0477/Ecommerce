@@ -1,74 +1,64 @@
-
 import api from './api';
 
 const productService = {
   getProducts: async (filters = {}) => {
-    try {
-      const params = new URLSearchParams(filters).toString();
-      const url = `/products${params ? `?${params}` : ''}`;
-      console.log('Fetching products from:', url);
-      
-      const response = await api.get(url);
-      console.log('Products response:', response.data); 
-      
-      
-      if (response.data && response.data.products) {
-        return response.data;
-      }
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      throw error;
-    }
+    // Remove empty/undefined filter values to keep the URL clean
+    const cleanFilters = Object.fromEntries(
+      Object.entries(filters).filter(([, v]) => v !== '' && v !== undefined && v !== null)
+    );
+    const params = new URLSearchParams(cleanFilters).toString();
+    const url = `/products${params ? `?${params}` : ''}`;
+    const response = await api.get(url);
+    return response.data; // { products, total, pages, currentPage }
   },
 
   getProductById: async (id) => {
-    try {
-      const response = await api.get(`/products/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching product:', error);
-      throw error;
-    }
+    const response = await api.get(`/products/${id}`);
+    return response.data;
   },
 
   getProductsByCategory: async (category) => {
-    try {
-      const response = await api.get(`/products/category/${category}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching products by category:', error);
-      throw error;
-    }
+    const response = await api.get(`/products/category/${encodeURIComponent(category)}`);
+    return response.data;
   },
 
+  // FIX: ProductForm already builds FormData and passes it here directly.
+  // Accept either a plain object OR a FormData — handle both cases.
   createProduct: async (productData) => {
-    const formData = new FormData();
-    Object.keys(productData).forEach(key => {
-      if (key === 'image' && productData[key]) {
-        formData.append('image', productData[key]);
-      } else if (productData[key] !== null && productData[key] !== undefined) {
-        formData.append(key, productData[key]);
-      }
-    });
-    const response = await api.post('/products', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    let payload;
+
+    if (productData instanceof FormData) {
+      // Already FormData — use as-is (from ProductForm)
+      payload = productData;
+    } else {
+      // Plain object — build FormData
+      payload = new FormData();
+      Object.entries(productData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          payload.append(key, value);
+        }
+      });
+    }
+
+    const response = await api.post('/products', payload);
     return response.data;
   },
 
   updateProduct: async (id, productData) => {
-    const formData = new FormData();
-    Object.keys(productData).forEach(key => {
-      if (key === 'image' && productData[key]) {
-        formData.append('image', productData[key]);
-      } else if (productData[key] !== null && productData[key] !== undefined) {
-        formData.append(key, productData[key]);
-      }
-    });
-    const response = await api.put(`/products/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    let payload;
+
+    if (productData instanceof FormData) {
+      payload = productData;
+    } else {
+      payload = new FormData();
+      Object.entries(productData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          payload.append(key, value);
+        }
+      });
+    }
+
+    const response = await api.put(`/products/${id}`, payload);
     return response.data;
   },
 

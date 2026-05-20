@@ -16,11 +16,15 @@ const orderService = {
     return response.data;
   },
 
+  // FIX: filter out empty/undefined params so we don't send ?status=&page=
   getAllOrders: async (params = {}) => {
-    const queryParams = new URLSearchParams(params).toString();
-    const url = queryParams ? `/orders/admin?${queryParams}` : '/orders/admin';
+    const cleanParams = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v !== '' && v !== undefined && v !== null)
+    );
+    const queryString = new URLSearchParams(cleanParams).toString();
+    const url = queryString ? `/orders/admin?${queryString}` : '/orders/admin';
     const response = await api.get(url);
-    return response.data;
+    return response.data; // { orders, total, pages, currentPage }
   },
 
   updateOrderStatus: async (id, status) => {
